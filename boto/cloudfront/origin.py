@@ -22,26 +22,76 @@
 
 from identity import OriginAccessIdentity
 
+class Origin(object):
+    """
+    Origin information to associate with the distribution.
+    """
+
+    def __init__(self, id=None, dns_name=None, config=None):
+        """
+        :param id: A unique id.
+        :type id: str
+        
+        :param dns_name: The DNS name of your Amazon S3 bucket to
+                         associate with the distribution.
+                         For example: mybucket.s3.amazonaws.com.
+        :type dns_name: str
+        
+        :param config: S3OriginConfig or CustomOriginConfig object
+        :type config: :class:`boto.cloudfront.origin.S3OriginConfig` or
+                      :class:`boto.cloudfront.origin.CustomOriginConfig`
+        
+        """
+        self.id = id
+        self.dns_name = dns_name
+        self.config = config
+
+    def __repr__(self):
+        return '<Origin: %s>' % self.dns_name
+
+    def startElement(self, name, attrs, connection):
+        if name == 'S3OriginConfig':
+            self.config = S3OriginConfig()
+            return self.config
+        elif name == 'CustomOriginConfig':
+            self.config = CustomOriginConfig()
+            return self.config
+        else:
+            return None
+
+    def endElement(self, name, value, connection):
+        if name == 'Id':
+            self.id = value
+        elif name == 'DomainName':
+            self.dns_name = value
+        else:
+            setattr(self, name, value)
+
+    def to_xml(self):
+        s = '  <Origin>\n'
+        s += '    <Id>%s</Id>\n' % self.id
+        s += '    <DomainName>%s</DomainName>\n' % self.dns_name
+        if self.config:
+            s += self.config.to_xml()
+        s += '  </Origin>\n'
+        return s
+    
+
 def get_oai_value(origin_access_identity):
     if isinstance(origin_access_identity, OriginAccessIdentity):
         return origin_access_identity.uri()
     else:
         return origin_access_identity
                 
-class S3Origin(object):
+class S3OriginConfig(object):
     """
     Origin information to associate with the distribution.
     If your distribution will use an Amazon S3 origin,
     then you use the S3Origin element.
     """
 
-    def __init__(self, dns_name=None, origin_access_identity=None):
+    def __init__(self, origin_access_identity=None):
         """
-        :param dns_name: The DNS name of your Amazon S3 bucket to
-                         associate with the distribution.
-                         For example: mybucket.s3.amazonaws.com.
-        :type dns_name: str
-        
         :param origin_access_identity: The CloudFront origin access
                                        identity to associate with the
                                        distribution. If you want the
@@ -52,47 +102,38 @@ class S3Origin(object):
         :type origin_access_identity: str
         
         """
-        self.dns_name = dns_name
         self.origin_access_identity = origin_access_identity
 
     def __repr__(self):
-        return '<S3Origin: %s>' % self.dns_name
+        return '<S3OriginConfig: %s>' % self.origin_access_identity
 
     def startElement(self, name, attrs, connection):
         return None
 
     def endElement(self, name, value, connection):
-        if name == 'DNSName':
-            self.dns_name = value
-        elif name == 'OriginAccessIdentity':
+        if name == 'OriginAccessIdentity':
             self.origin_access_identity = value
         else:
             setattr(self, name, value)
 
     def to_xml(self):
-        s = '  <S3Origin>\n'
-        s += '    <DNSName>%s</DNSName>\n' % self.dns_name
+        s = '  <S3OriginConfig>\n'
         if self.origin_access_identity:
             val = get_oai_value(self.origin_access_identity)
             s += '    <OriginAccessIdentity>%s</OriginAccessIdentity>\n' % val
-        s += '  </S3Origin>\n'
+        s += '  </S3OriginConfig>\n'
         return s
     
-class CustomOrigin(object):
+class CustomOriginConfig(object):
     """
     Origin information to associate with the distribution.
     If your distribution will use a non-Amazon S3 origin,
-    then you use the CustomOrigin element.
+    then you use the CustomOriginConfig element.
     """
 
-    def __init__(self, dns_name=None, http_port=80, https_port=443,
+    def __init__(self, http_port=80, https_port=443,
                  origin_protocol_policy=None):
         """
-        :param dns_name: The DNS name of your Amazon S3 bucket to
-                         associate with the distribution.
-                         For example: mybucket.s3.amazonaws.com.
-        :type dns_name: str
-        
         :param http_port: The HTTP port the custom origin listens on.
         :type http_port: int
         
@@ -110,21 +151,18 @@ class CustomOrigin(object):
         :type origin_protocol_policy: str
         
         """
-        self.dns_name = dns_name
         self.http_port = http_port
         self.https_port = https_port
         self.origin_protocol_policy = origin_protocol_policy
 
     def __repr__(self):
-        return '<CustomOrigin: %s>' % self.dns_name
+        return '<CustomOriginConfig>'
 
     def startElement(self, name, attrs, connection):
         return None
 
     def endElement(self, name, value, connection):
-        if name == 'DNSName':
-            self.dns_name = value
-        elif name == 'HTTPPort':
+        if name == 'HTTPPort':
             try:
                 self.http_port = int(value)
             except ValueError:
@@ -140,11 +178,10 @@ class CustomOrigin(object):
             setattr(self, name, value)
 
     def to_xml(self):
-        s = '  <CustomOrigin>\n'
-        s += '    <DNSName>%s</DNSName>\n' % self.dns_name
+        s = '  <CustomOriginConfig>\n'
         s += '    <HTTPPort>%d</HTTPPort>\n' % self.http_port
         s += '    <HTTPSPort>%d</HTTPSPort>\n' % self.https_port
         s += '    <OriginProtocolPolicy>%s</OriginProtocolPolicy>\n' % self.origin_protocol_policy
-        s += '  </CustomOrigin>\n'
+        s += '  </CustomOriginConfig>\n'
         return s
     

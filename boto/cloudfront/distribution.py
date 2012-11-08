@@ -27,24 +27,25 @@ from boto.cloudfront.identity import OriginAccessIdentity
 from boto.cloudfront.object import Object, StreamingObject
 from boto.cloudfront.signers import ActiveTrustedSigners, TrustedSigners
 from boto.cloudfront.logging import LoggingInfo
-from boto.cloudfront.origin import S3Origin, CustomOrigin
+from boto.cloudfront.origin import Origin, S3OriginConfig
+from boto.cloudfront.behavior import CacheBehavior
 from boto.s3.acl import ACL
 
 class DistributionConfig:
 
     def __init__(self, connection=None, origin=None, enabled=False,
                  caller_reference='', cnames=None, comment='',
-                 trusted_signers=None, default_root_object=None,
+                 trusted_signers=None, default_behavior=None, cache_behaviors=None, default_root_object=None,
                  logging=None):
         """
         :param origin: Origin information to associate with the
                        distribution.  If your distribution will use
                        an Amazon S3 origin, then this should be an
-                       S3Origin object. If your distribution will use
+                       Origin object with an S3OriginConfig object.
+                       If your distribution will use
                        a custom origin (non Amazon S3), then this
-                       should be a CustomOrigin object.
-        :type origin: :class:`boto.cloudfront.origin.S3Origin` or
-                      :class:`boto.cloudfront.origin.CustomOrigin`
+                       should be an Origin object with an CustomOriginConfig object.
+        :type origin: :class:`boto.cloudfront.origin.Origin`
 
         :param enabled: Whether the distribution is enabled to accept
                         end user requests for content.
@@ -75,6 +76,9 @@ class DistributionConfig:
                                 this None.
         :type trusted_signers: :class`boto.cloudfront.signers.TrustedSigners`
 
+        :param default_behavior: Forward query strings, etc.
+        :type default_behavior: :class`boto.cloudfront.behavior.CacheBehavior`
+
         :param default_root_object: Designates a default root object.
                                     Only include a DefaultRootObject value
                                     if you are going to assign a default
@@ -100,17 +104,30 @@ class DistributionConfig:
             self.cnames = cnames
         self.comment = comment
         self.trusted_signers = trusted_signers
+        self.default_behavior = default_behavior
+        self.cache_behaviors = cache_behaviors
         self.logging = None
         self.default_root_object = default_root_object
 
     def to_xml(self):
         s = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        s += '<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/2010-07-15/">\n'
-        if self.origin:
-            s += self.origin.to_xml()
+        s += '<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/2012-05-05/">\n'
         s += '  <CallerReference>%s</CallerReference>\n' % self.caller_reference
-        for cname in self.cnames:
-            s += '  <CNAME>%s</CNAME>\n' % cname
+        if self.origin:
+            s += '<Origins>\n'
+            s += '<Quantity>1</Quantity>\n'
+            s += '<Items>\n'
+            s += self.origin.to_xml()
+            s += '</Items>\n'
+            s += '</Origins>\n'
+        if len(self.cnames):
+            s += '<Aliases>\n'
+            s += '<Quantity>%d</Quantity>\n' % len(self.cnames)
+            s += '<Items>\n'
+            for cname in self.cnames:
+                s += '  <CNAME>%s</CNAME>\n' % cname
+            s += '</Items>\n'
+            s += '</Aliases>\n'
         if self.comment:
             s += '  <Comment>%s</Comment>\n' % self.comment
         s += '  <Enabled>'
@@ -119,6 +136,14 @@ class DistributionConfig:
         else:
             s += 'false'
         s += '</Enabled>\n'
+        if self.default_behavior:
+            s += self.default_behavior.to_xml()
+        s += '<CacheBehaviors>\n'
+        s += '<Quantity>%d</Quantity>\n' % (len(self.cache_behaviors) if self.cache_behaviors else 0)
+        if self.cache_behaviors:
+            for behavior in self.cache_behaviors:
+                s += self.cache_behaviors.to_xml()
+        s += '</CacheBehaviors>\n'
         if self.trusted_signers:
             s += '<TrustedSigners>\n'
             for signer in self.trusted_signers:
@@ -127,11 +152,11 @@ class DistributionConfig:
                 else:
                     s += '  <AwsAccountNumber>%s</AwsAccountNumber>\n' % signer
             s += '</TrustedSigners>\n'
-        if self.logging:
-            s += '<Logging>\n'
-            s += '  <Bucket>%s</Bucket>\n' % self.logging.bucket
-            s += '  <Prefix>%s</Prefix>\n' % self.logging.prefix
-            s += '</Logging>\n'
+        s += '<Logging>\n'
+        s += '  <Enabled>%s</Enabled>\n' % ('true' if self.logging else 'false')
+        s += '  <Bucket>%s</Bucket>\n' % (self.logging.bucket if self.logging else '')
+        s += '  <Prefix>%s</Prefix>\n' % (self.logging.prefix if self.logging else '')
+        s += '</Logging>\n'
         if self.default_root_object:
             dro = self.default_root_object
             s += '<DefaultRootObject>%s</DefaultRootObject>\n' % dro
@@ -139,17 +164,17 @@ class DistributionConfig:
         return s
 
     def startElement(self, name, attrs, connection):
-        if name == 'TrustedSigners':
+        if name == 'DefaultCacheBehavior':
+            self.default_behavior = CacheBehavior( default=True )
+            return self.default_behavior
+        elif name == 'TrustedSigners':
             self.trusted_signers = TrustedSigners()
             return self.trusted_signers
         elif name == 'Logging':
             self.logging = LoggingInfo()
             return self.logging
-        elif name == 'S3Origin':
-            self.origin = S3Origin()
-            return self.origin
-        elif name == 'CustomOrigin':
-            self.origin = CustomOrigin()
+        elif name == 'Origin':
+            self.origin = Origin()
             return self.origin
         else:
             return None
@@ -238,11 +263,8 @@ class DistributionSummary:
         if name == 'TrustedSigners':
             self.trusted_signers = TrustedSigners()
             return self.trusted_signers
-        elif name == 'S3Origin':
-            self.origin = S3Origin()
-            return self.origin
-        elif name == 'CustomOrigin':
-            self.origin = CustomOrigin()
+        elif name == 'Origin':
+            self.origin = Origin()
             return self.origin
         return None
 
@@ -345,11 +367,12 @@ class Distribution:
         :param comment: The comment associated with the Distribution.
 
         """
-        new_config = DistributionConfig(self.connection, self.config.origin,
-                                        self.config.enabled, self.config.caller_reference,
-                                        self.config.cnames, self.config.comment,
-                                        self.config.trusted_signers,
-                                        self.config.default_root_object)
+        new_config = DistributionConfig(connection=self.connection, origin=self.config.origin,
+                                        enabled=self.config.enabled, caller_reference=self.config.caller_reference,
+                                        cnames=self.config.cnames, comment=self.config.comment,
+                                        trusted_signers=self.config.trusted_signers,
+                                        default_behavior=self.config.default_behavior,
+                                        default_root_object=self.config.default_root_object)
         if enabled != None:
             new_config.enabled = enabled
         if cnames != None:
@@ -383,7 +406,7 @@ class Distribution:
         self.connection.delete_distribution(self.id, self.etag)
 
     def _get_bucket(self):
-        if isinstance(self.config.origin, S3Origin):
+        if isinstance(self.config.origin.config, S3OriginConfig):
             if not self._bucket:
                 bucket_dns_name = self.config.origin.dns_name
                 bucket_name = bucket_dns_name.replace('.s3.amazonaws.com', '')
@@ -434,9 +457,9 @@ class Distribution:
                         READ permission to the Origin Access Identity.
 
         """
-        if isinstance(self.config.origin, S3Origin):
-            if self.config.origin.origin_access_identity:
-                id = self.config.origin.origin_access_identity.split('/')[-1]
+        if isinstance(self.config.origin.config, S3OriginConfig):
+            if self.config.origin.config.origin_access_identity:
+                id = self.config.origin.config.origin_access_identity.split('/')[-1]
                 oai = self.connection.get_origin_access_identity_info(id)
                 policy = object.get_acl()
                 if replace:
@@ -485,14 +508,14 @@ class Distribution:
         :rtype: :class:`boto.cloudfront.object.Object`
         :return: The newly created object.
         """
-        if self.config.origin.origin_access_identity:
+        if self.config.origin.config.origin_access_identity:
             policy = 'private'
         else:
             policy = 'public-read'
         bucket = self._get_bucket()
         object = bucket.new_key(name)
         object.set_contents_from_file(content, headers=headers, policy=policy)
-        if self.config.origin.origin_access_identity:
+        if self.config.origin.config.origin_access_identity:
             self.set_permissions(object, replace)
         return object
 
