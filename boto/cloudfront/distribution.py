@@ -106,7 +106,7 @@ class DistributionConfig:
         self.trusted_signers = trusted_signers
         self.default_behavior = default_behavior
         self.cache_behaviors = cache_behaviors
-        self.logging = None
+        self.logging = logging
         self.default_root_object = default_root_object
 
     def to_xml(self):
