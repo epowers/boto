@@ -27,7 +27,7 @@ class CacheBehavior(object):
     Cache behavior information to associate with the distribution.
     """
 
-    def __init__(self, trusted_signers=None, origin_id=None, query_string=False, viewer_protocol_policy=None, min_ttl=None, default=False):
+    def __init__(self, trusted_signers=None, origin_id=None, query_string=False, viewer_protocol_policy=None, min_ttl=None, cookies=None, default=False):
         """
         :param trusted_signers: Specifies any AWS accounts you want to
                                 permit to create signed URLs for private
@@ -53,6 +53,7 @@ class CacheBehavior(object):
         self.query_string = query_string
         self.viewer_protocol_policy = viewer_protocol_policy
         self.min_ttl = min_ttl
+        self.cookies = cookies
 
     def __repr__(self):
         container = 'DefaultCacheBehavior' if self.default else 'CacheBehavior'
@@ -77,29 +78,31 @@ class CacheBehavior(object):
             self.viewer_protocol_policy = value
         elif name == 'MinTTL':
             self.min_ttl = value
+        elif name == 'Forward':
+            self.cookies = value
         else:
             setattr(self, name, value)
 
     def to_xml(self):
         container = 'DefaultCacheBehavior' if self.default else 'CacheBehavior'
-        s = '  <%s>\n' % container
-        s += '    <TargetOriginId>%s</TargetOriginId>\n' % self.origin_id
-        s += '    <ForwardedValues>\n'
-        s += '      <QueryString>%s</QueryString>\n' % ('true' if self.query_string else 'false')
-        s += '    </ForwardedValues>\n'
-        s += '<TrustedSigners>\n'
-        s += '<Enabled>true</Enabled>\n'
-        s += '<Quantity>%d</Quantity>\n' % (len(self.trusted_signers) if self.trusted_signers else 0)
+        s = '<%s>\n' % container
+        s += '  <TargetOriginId>%s</TargetOriginId>\n' % self.origin_id
+        s += '  <ForwardedValues>\n'
+        s += '    <QueryString>%s</QueryString>\n' % ('true' if self.query_string else 'false')
+        s += '    <Cookies>\n'
+        s += '      <Forward>%s</Forward>\n' % (self.cookies or 'none')
+        s += '    </Cookies>\n'
+        s += '  </ForwardedValues>\n'
+        s += '  <TrustedSigners>\n'
+        s += '    <Enabled>%s</Enabled>\n' % ('true' if self.trusted_signers else 'false')
+        s += '    <Quantity>%d</Quantity>\n' % (len(self.trusted_signers) if self.trusted_signers else 0)
         if self.trusted_signers:
-            s += '<Items>\n'
+            s += '      <Items>\n'
             for signer in self.trusted_signers:
-                #if signer == 'Self': signer = 'self'
-                s += '  <AwsAccountNumber>%s</AwsAccountNumber>\n' % signer
-            s += '</Items>\n'
-        s += '</TrustedSigners>\n'
-        if self.viewer_protocol_policy:
-            s += '    <ViewerProtocolPolicy>%s</ViewerProtocolPolicy>\n' % self.viewer_protocol_policy
-        if self.min_ttl:
-            s += '    <MinTTL>%s</MinTTL>\n' % self.min_ttl
-        s += '  </%s>\n' % container
+                s += '        <AwsAccountNumber>%s</AwsAccountNumber>\n' % signer
+            s += '      </Items>\n'
+        s += '  </TrustedSigners>\n'
+        s += '  <ViewerProtocolPolicy>%s</ViewerProtocolPolicy>\n' % (self.viewer_protocol_policy or 'allow-all')
+        s += '  <MinTTL>%s</MinTTL>\n' % (self.min_ttl or '0')
+        s += '</%s>\n' % container
         return s

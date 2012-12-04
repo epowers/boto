@@ -23,6 +23,7 @@ import uuid
 import base64
 import time
 from boto.compat import json
+import boto.cloudfront
 from boto.cloudfront.identity import OriginAccessIdentity
 from boto.cloudfront.object import Object, StreamingObject
 from boto.cloudfront.signers import ActiveTrustedSigners, TrustedSigners
@@ -35,7 +36,7 @@ class DistributionConfig:
 
     def __init__(self, connection=None, origin=None, enabled=False,
                  caller_reference='', cnames=None, comment='',
-                 trusted_signers=None, default_behavior=None, cache_behaviors=None, default_root_object=None,
+                 default_behavior=None, cache_behaviors=None, default_root_object=None,
                  logging=None):
         """
         :param origin: Origin information to associate with the
@@ -103,7 +104,6 @@ class DistributionConfig:
         if cnames:
             self.cnames = cnames
         self.comment = comment
-        self.trusted_signers = trusted_signers
         self.default_behavior = default_behavior
         self.cache_behaviors = cache_behaviors
         self.logging = logging
@@ -111,55 +111,43 @@ class DistributionConfig:
 
     def to_xml(self):
         s = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        s += '<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/2012-05-05/">\n'
+        s += '<DistributionConfig xmlns="http://cloudfront.amazonaws.com/doc/%s/">\n' % boto.cloudfront.CloudFrontConnection.Version
         s += '  <CallerReference>%s</CallerReference>\n' % self.caller_reference
-        if self.origin:
-            s += '<Origins>\n'
-            s += '<Quantity>1</Quantity>\n'
-            s += '<Items>\n'
-            s += self.origin.to_xml()
-            s += '</Items>\n'
-            s += '</Origins>\n'
-        if len(self.cnames):
-            s += '<Aliases>\n'
-            s += '<Quantity>%d</Quantity>\n' % len(self.cnames)
+        s += '<Aliases>\n'
+        s += '<Quantity>%d</Quantity>\n' % (len(self.cnames) if self.cnames else 0)
+        if self.cnames:
             s += '<Items>\n'
             for cname in self.cnames:
                 s += '  <CNAME>%s</CNAME>\n' % cname
             s += '</Items>\n'
-            s += '</Aliases>\n'
-        if self.comment:
-            s += '  <Comment>%s</Comment>\n' % self.comment
-        s += '  <Enabled>'
-        if self.enabled:
-            s += 'true'
-        else:
-            s += 'false'
-        s += '</Enabled>\n'
+        s += '</Aliases>\n'
+        s += '<DefaultRootObject>%s</DefaultRootObject>\n' % self.default_root_object or ''
+        s += '<Origins>\n'
+        s += '<Quantity>%d</Quantity>\n' % (1 if self.origin else 0)
+        if self.origin:
+            s += '<Items>\n'
+            s += self.origin.to_xml()
+            s += '</Items>\n'
+        s += '</Origins>\n'
         if self.default_behavior:
             s += self.default_behavior.to_xml()
         s += '<CacheBehaviors>\n'
         s += '<Quantity>%d</Quantity>\n' % (len(self.cache_behaviors) if self.cache_behaviors else 0)
         if self.cache_behaviors:
+            s += '<Items>\n'
             for behavior in self.cache_behaviors:
                 s += self.cache_behaviors.to_xml()
+            s += '</Items>\n'
         s += '</CacheBehaviors>\n'
-        if self.trusted_signers:
-            s += '<TrustedSigners>\n'
-            for signer in self.trusted_signers:
-                if signer == 'Self':
-                    s += '  <Self></Self>\n'
-                else:
-                    s += '  <AwsAccountNumber>%s</AwsAccountNumber>\n' % signer
-            s += '</TrustedSigners>\n'
+        s += '<Comment>%s</Comment>\n' % (self.comment or '')
         s += '<Logging>\n'
         s += '  <Enabled>%s</Enabled>\n' % ('true' if self.logging else 'false')
-        s += '  <Bucket>%s</Bucket>\n' % (self.logging.bucket if self.logging else '')
-        s += '  <Prefix>%s</Prefix>\n' % (self.logging.prefix if self.logging else '')
+        s += '  <IncludeCookies>%s</IncludeCookies>\n' % ('true' if self.logging and self.logging.include_cookies else 'false')
+        s += '  <Bucket>%s</Bucket>\n' % (self.logging.bucket if self.logging and self.logging.bucket else '')
+        s += '  <Prefix>%s</Prefix>\n' % (self.logging.prefix if self.logging and self.logging.prefix else '')
         s += '</Logging>\n'
-        if self.default_root_object:
-            dro = self.default_root_object
-            s += '<DefaultRootObject>%s</DefaultRootObject>\n' % dro
+        s += '<Enabled>%s</Enabled>\n' % ('true' if self.enabled else 'false')
+        s += '<PriceClass>PriceClass_All</PriceClass>\n'
         s += '</DistributionConfig>\n'
         return s
 
@@ -167,9 +155,6 @@ class DistributionConfig:
         if name == 'DefaultCacheBehavior':
             self.default_behavior = CacheBehavior( default=True )
             return self.default_behavior
-        elif name == 'TrustedSigners':
-            self.trusted_signers = TrustedSigners()
-            return self.trusted_signers
         elif name == 'Logging':
             self.logging = LoggingInfo()
             return self.logging
@@ -200,12 +185,11 @@ class StreamingDistributionConfig(DistributionConfig):
 
     def __init__(self, connection=None, origin='', enabled=False,
                  caller_reference='', cnames=None, comment='',
-                 trusted_signers=None, logging=None):
+                 logging=None):
         DistributionConfig.__init__(self, connection=connection,
                                     origin=origin, enabled=enabled,
                                     caller_reference=caller_reference,
                                     cnames=cnames, comment=comment,
-                                    trusted_signers=trusted_signers,
                                     logging=logging)
     def to_xml(self):
         s = '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -223,14 +207,6 @@ class StreamingDistributionConfig(DistributionConfig):
         else:
             s += 'false'
         s += '</Enabled>\n'
-        if self.trusted_signers:
-            s += '<TrustedSigners>\n'
-            for signer in self.trusted_signers:
-                if signer == 'Self':
-                    s += '  <Self/>\n'
-                else:
-                    s += '  <AwsAccountNumber>%s</AwsAccountNumber>\n' % signer
-            s += '</TrustedSigners>\n'
         if self.logging:
             s += '<Logging>\n'
             s += '  <Bucket>%s</Bucket>\n' % self.logging.bucket
@@ -255,15 +231,11 @@ class DistributionSummary:
         if cname:
             self.cnames.append(cname)
         self.comment = comment
-        self.trusted_signers = None
         self.etag = None
         self.streaming = False
 
     def startElement(self, name, attrs, connection):
-        if name == 'TrustedSigners':
-            self.trusted_signers = TrustedSigners()
-            return self.trusted_signers
-        elif name == 'Origin':
+        if name == 'Origin':
             self.origin = Origin()
             return self.origin
         return None
@@ -350,7 +322,7 @@ class Distribution:
          * Comment
          * Whether the Distribution is enabled or not
 
-        Any changes to the ``trusted_signers`` or ``origin`` properties of
+        Any changes to the ``origin`` properties of
         this distribution's current config object will also be included in
         the update. Therefore, to set the origin access identity for this
         distribution, set ``Distribution.config.origin.origin_access_identity``
@@ -370,7 +342,6 @@ class Distribution:
         new_config = DistributionConfig(connection=self.connection, origin=self.config.origin,
                                         enabled=self.config.enabled, caller_reference=self.config.caller_reference,
                                         cnames=self.config.cnames, comment=self.config.comment,
-                                        trusted_signers=self.config.trusted_signers,
                                         default_behavior=self.config.default_behavior,
                                         default_root_object=self.config.default_root_object)
         if enabled != None:
@@ -725,7 +696,7 @@ class StreamingDistribution(Distribution):
          * Comment
          * Whether the Distribution is enabled or not
 
-        Any changes to the ``trusted_signers`` or ``origin`` properties of
+        Any changes to the ``origin`` properties of
         this distribution's current config object will also be included in
         the update. Therefore, to set the origin access identity for this
         distribution, set
@@ -748,8 +719,7 @@ class StreamingDistribution(Distribution):
                                                  self.config.enabled,
                                                  self.config.caller_reference,
                                                  self.config.cnames,
-                                                 self.config.comment,
-                                                 self.config.trusted_signers)
+                                                 self.config.comment)
         if enabled != None:
             new_config.enabled = enabled
         if cnames != None:

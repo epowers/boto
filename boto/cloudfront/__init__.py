@@ -38,7 +38,7 @@ from boto.cloudfront.exception import CloudFrontServerError
 class CloudFrontConnection(AWSAuthConnection):
 
     DefaultHost = 'cloudfront.amazonaws.com'
-    Version = '2012-05-05'
+    Version = '2012-07-01'
 
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
                  port=None, proxy=None, proxy_port=None,
@@ -163,13 +163,12 @@ class CloudFrontConnection(AWSAuthConnection):
         return self._set_config(distribution_id, etag, config)
 
     def create_distribution(self, origin, enabled, caller_reference='',
-                            cnames=None, comment='', trusted_signers=None,
+                            cnames=None, comment='',
                             default_behavior=None, default_root_object=None,
                             logging=None):
         config = DistributionConfig(origin=origin, enabled=enabled,
                                     caller_reference=caller_reference,
                                     cnames=cnames, comment=comment,
-                                    trusted_signers=trusted_signers,
                                     default_behavior=default_behavior,
                                     default_root_object=default_root_object,
                                     logging=logging)
@@ -197,12 +196,10 @@ class CloudFrontConnection(AWSAuthConnection):
 
     def create_streaming_distribution(self, origin, enabled,
                                       caller_reference='',
-                                      cnames=None, comment='',
-                                      trusted_signers=None):
+                                      cnames=None, comment=''):
         config = StreamingDistributionConfig(origin=origin, enabled=enabled,
                                              caller_reference=caller_reference,
-                                             cnames=cnames, comment=comment,
-                                             trusted_signers=trusted_signers)
+                                             cnames=cnames, comment=comment)
         return self._create_object(config, 'streaming-distribution',
                                    StreamingDistribution)
 
