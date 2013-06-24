@@ -165,11 +165,13 @@ class CloudFrontConnection(AWSAuthConnection):
     def create_distribution(self, origin, enabled, caller_reference='',
                             cnames=None, comment='',
                             default_behavior=None, default_root_object=None,
+                            cache_behaviors=None,
                             logging=None):
         config = DistributionConfig(origin=origin, enabled=enabled,
                                     caller_reference=caller_reference,
                                     cnames=cnames, comment=comment,
                                     default_behavior=default_behavior,
+                                    cache_behaviors=cache_behaviors,
                                     default_root_object=default_root_object,
                                     logging=logging)
         return self._create_object(config, 'distribution', Distribution)
