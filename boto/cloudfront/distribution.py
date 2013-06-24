@@ -136,7 +136,7 @@ class DistributionConfig:
         if self.cache_behaviors:
             s += '<Items>\n'
             for behavior in self.cache_behaviors:
-                s += self.cache_behaviors.to_xml()
+                s += behavior.to_xml()
             s += '</Items>\n'
         s += '</CacheBehaviors>\n'
         s += '<Comment>%s</Comment>\n' % (self.comment or '')

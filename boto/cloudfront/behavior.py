@@ -27,7 +27,7 @@ class CacheBehavior(object):
     Cache behavior information to associate with the distribution.
     """
 
-    def __init__(self, trusted_signers=None, origin_id=None, path_pattern=None, query_string=False, viewer_protocol_policy=None, min_ttl=None, cookies=None, default=False):
+    def __init__(self, trusted_signers=None, origin_id=None, path_pattern=None, query_string=False, viewer_protocol_policy=None, min_ttl=None, cookies=None, whitelist=None, default=False):
         """
         :param trusted_signers: Specifies any AWS accounts you want to
                                 permit to create signed URLs for private
@@ -55,6 +55,7 @@ class CacheBehavior(object):
         self.viewer_protocol_policy = viewer_protocol_policy
         self.min_ttl = min_ttl
         self.cookies = cookies
+        self.whitelist = whitelist
 
     def __repr__(self):
         container = 'DefaultCacheBehavior' if self.default else 'CacheBehavior'
@@ -96,6 +97,15 @@ class CacheBehavior(object):
         s += '    <QueryString>%s</QueryString>\n' % ('true' if self.query_string else 'false')
         s += '    <Cookies>\n'
         s += '      <Forward>%s</Forward>\n' % (self.cookies or 'none')
+        if self.cookies == 'whitelist':
+            s += '      <WhitelistedNames>\n'
+            s += '        <Quantity>%d</Quantity>\n' % len(self.whitelist) if self.whitelist else 0
+            if self.whitelist and len(self.whitelist):
+                s += '        <Items>\n'
+                for name in self.whitelist:
+                    s += '        <Name>%s</Name>\n' % name
+                s += '        </Items>\n'
+            s += '      </WhitelistedNames>\n'
         s += '    </Cookies>\n'
         s += '  </ForwardedValues>\n'
         s += '  <TrustedSigners>\n'
