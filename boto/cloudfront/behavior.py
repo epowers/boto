@@ -27,7 +27,7 @@ class CacheBehavior(object):
     Cache behavior information to associate with the distribution.
     """
 
-    def __init__(self, trusted_signers=None, origin_id=None, query_string=False, viewer_protocol_policy=None, min_ttl=None, cookies=None, default=False):
+    def __init__(self, trusted_signers=None, origin_id=None, path_pattern=None, query_string=False, viewer_protocol_policy=None, min_ttl=None, cookies=None, default=False):
         """
         :param trusted_signers: Specifies any AWS accounts you want to
                                 permit to create signed URLs for private
@@ -50,6 +50,7 @@ class CacheBehavior(object):
         self.default = default
         self.trusted_signers = trusted_signers
         self.origin_id = origin_id
+        self.path_pattern = path_pattern
         self.query_string = query_string
         self.viewer_protocol_policy = viewer_protocol_policy
         self.min_ttl = min_ttl
@@ -69,6 +70,8 @@ class CacheBehavior(object):
     def endElement(self, name, value, connection):
         if name == 'TargetOriginId':
             self.origin_id = value
+        elif name == 'PathPattern':
+            self.path_pattern = value
         elif name == 'QueryString':
             if value.lower() == 'true':
                 self.query_string = True
@@ -87,6 +90,8 @@ class CacheBehavior(object):
         container = 'DefaultCacheBehavior' if self.default else 'CacheBehavior'
         s = '<%s>\n' % container
         s += '  <TargetOriginId>%s</TargetOriginId>\n' % self.origin_id
+        if self.path_pattern:
+            s += '  <PathPattern>%s</PathPattern>\n' % self.path_pattern
         s += '  <ForwardedValues>\n'
         s += '    <QueryString>%s</QueryString>\n' % ('true' if self.query_string else 'false')
         s += '    <Cookies>\n'
