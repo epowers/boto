@@ -78,9 +78,15 @@ class InvalidationBatch(object):
         assert self.connection != None
         s = '<?xml version="1.0" encoding="UTF-8"?>\n'
         s += '<InvalidationBatch xmlns="http://cloudfront.amazonaws.com/doc/%s/">\n' % self.connection.Version
-        for p in self.paths:
-            s += '    <Path>%s</Path>\n' % self.escape(p)
-        s += '    <CallerReference>%s</CallerReference>\n' % self.caller_reference
+        s += '  <Paths>\n'
+        s += '    <Quantity>%d</Quantity>\n' % len(self.paths)
+        if len(self.paths):
+            s += '    <Items>\n'
+            for p in self.paths:
+                s += '    <Path>%s</Path>\n' % self.escape(p)
+            s += '    </Items>\n'
+        s += '  </Paths>\n'
+        s += '  <CallerReference>%s</CallerReference>\n' % self.caller_reference
         s += '</InvalidationBatch>\n'
         return s
 
