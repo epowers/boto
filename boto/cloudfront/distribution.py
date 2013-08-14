@@ -155,6 +155,13 @@ class DistributionConfig:
         if name == 'DefaultCacheBehavior':
             self.default_behavior = CacheBehavior( default=True )
             return self.default_behavior
+        elif name == 'CacheBehaviors':
+            self.cache_behaviors = []
+            return None
+        elif name == 'CacheBehavior':
+            behavior = CacheBehavior( default=True )
+            self.cache_behaviors.append( behavior )
+            return behavior
         elif name == 'Logging':
             self.logging = LoggingInfo()
             return self.logging

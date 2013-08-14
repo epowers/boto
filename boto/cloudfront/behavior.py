@@ -65,6 +65,9 @@ class CacheBehavior(object):
         if name == 'TrustedSigners':
             self.trusted_signers = TrustedSigners()
             return self.trusted_signers
+        elif name == 'WhitelistedNames':
+            self.whitelist = []
+            return None
         else:
             return None
 
@@ -84,6 +87,9 @@ class CacheBehavior(object):
             self.min_ttl = value
         elif name == 'Forward':
             self.cookies = value
+        elif name == 'Name':
+            self.whitelist.append( value )
+            return None
         else:
             setattr(self, name, value)
 
