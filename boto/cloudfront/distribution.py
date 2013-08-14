@@ -343,7 +343,9 @@ class Distribution:
                                         enabled=self.config.enabled, caller_reference=self.config.caller_reference,
                                         cnames=self.config.cnames, comment=self.config.comment,
                                         default_behavior=self.config.default_behavior,
-                                        default_root_object=self.config.default_root_object)
+                                        cache_behaviors=self.config.cache_behaviors,
+                                        default_root_object=self.config.default_root_object,
+                                        logging=self.config.logging)
         if enabled != None:
             new_config.enabled = enabled
         if cnames != None:
