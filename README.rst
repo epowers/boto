@@ -1,11 +1,15 @@
 ####
 boto
 ####
-boto 2.9.2
-30-Apr-2013
+boto 2.9.6
 
-.. image:: https://secure.travis-ci.org/boto/boto.png?branch=develop
-        :target: https://secure.travis-ci.org/boto/boto
+Released: 18-June-2013
+
+.. image:: https://travis-ci.org/boto/boto.png?branch=develop
+        :target: https://travis-ci.org/boto/boto
+        
+.. image:: https://pypip.in/d/boto/badge.png
+        :target: https://crate.io/packages/boto/
 
 ************
 Introduction
@@ -30,6 +34,7 @@ At the moment, boto supports:
   * Amazon DynamoDB
   * Amazon SimpleDB
   * Amazon ElastiCache
+  * Amazon Redshift
 
 * Deployment and Management
 
@@ -49,7 +54,7 @@ At the moment, boto supports:
   * Amazon Simple Notification Server (SNS)
   * Amazon Simple Email Service (SES)
 
-* Montoring
+* Monitoring
 
   * Amazon CloudWatch
 
@@ -77,6 +82,7 @@ At the moment, boto supports:
 * Other
 
   * Marketplace Web Services
+  * AWS Support
 
 The goal of boto is to support the full breadth and depth of Amazon
 Web Services.  In addition, boto provides support for other public
